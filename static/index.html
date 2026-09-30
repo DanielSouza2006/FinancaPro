@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FinançaPro — Entrar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💎</text></svg>">
+  <script src="/js/common.js"></script>
+</head>
+<body>
+  <div class="auth">
+    <!-- Lado esquerdo: apresentação -->
+    <section class="auth-hero">
+      <div class="brand"><div class="brand-logo">💎</div> FinançaPro</div>
+
+      <div>
+        <h1>Controle total do seu dinheiro, em um só lugar.</h1>
+        <p class="lead">Acompanhe receitas e despesas, defina orçamentos, crie metas e veja para onde vai cada real.</p>
+        <ul class="features">
+          <li><span>📊</span> Painel com gráficos em tempo real</li>
+          <li><span>🎯</span> Metas de economia com progresso</li>
+          <li><span>🧾</span> Orçamentos por categoria com alertas</li>
+          <li><span>🔒</span> Senhas criptografadas e sessão segura</li>
+        </ul>
+        <div class="float-cards" aria-hidden="true">
+          <div class="float-card c1">
+            <small>Saldo total</small>
+            <strong>R$ 24.580,90</strong>
+            <span class="up">▲ 12,4% este mês</span>
+          </div>
+          <div class="float-card c2">
+            <small>Gastos por semana</small>
+            <div class="mini-bars"><i style="height:40%"></i><i style="height:70%"></i><i style="height:55%"></i><i style="height:90%"></i><i style="height:65%"></i><i style="height:80%"></i></div>
+          </div>
+          <div class="float-card c3">
+            <small>Meta: Viagem ✈️</small>
+            <strong>68%</strong>
+          </div>
+        </div>
+      </div>
+
+      <footer>© 2026 FinançaPro · Projeto de estudo</footer>
+    </section>
+
+    <!-- Lado direito: formulários -->
+    <section class="auth-panel">
+      <button class="btn-icon btn theme-float" id="themeBtn" title="Alternar tema" aria-label="Alternar tema"></button>
+
+      <div class="auth-box">
+        <h2 id="title">Bem-vindo de volta 👋</h2>
+        <p class="sub" id="subtitle">Entre para acessar seu painel financeiro.</p>
+
+        <div class="tabs" id="tabs" data-active="login" role="tablist">
+          <div class="indicator"></div>
+          <button class="active" data-tab="login" role="tab">Entrar</button>
+          <button data-tab="register" role="tab">Criar conta</button>
+        </div>
+
+        <div id="alert" class="auth-alert hidden"></div>
+
+        <!-- LOGIN -->
+        <form id="loginForm" class="form-pane" novalidate>
+          <div class="field">
+            <label for="loginEmail">E-mail</label>
+            <div class="input-wrap">
+              <span class="ico" data-icon="mail"></span>
+              <input class="input" id="loginEmail" type="email" placeholder="voce@email.com" autocomplete="email" required>
+            </div>
+          </div>
+          <div class="field">
+            <label for="loginPassword">Senha</label>
+            <div class="input-wrap">
+              <span class="ico" data-icon="lock"></span>
+              <input class="input" id="loginPassword" type="password" placeholder="Sua senha" autocomplete="current-password" required>
+              <button type="button" class="toggle-pw" aria-label="Mostrar senha"></button>
+            </div>
+          </div>
+          <div class="form-extra">
+            <label class="check"><input type="checkbox" id="remember" checked> Lembrar de mim</label>
+            <a href="#" id="forgot">Esqueci a senha</a>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Entrar</button>
+        </form>
+
+        <!-- CADASTRO -->
+        <form id="registerForm" class="form-pane hidden" novalidate>
+          <div class="field">
+            <label for="regName">Nome</label>
+            <div class="input-wrap">
+              <span class="ico" data-icon="user"></span>
+              <input class="input" id="regName" type="text" placeholder="Seu nome" autocomplete="name" required>
+            </div>
+            <span class="field-error" data-for="regName"></span>
+          </div>
+          <div class="field">
+            <label for="regEmail">E-mail</label>
+            <div class="input-wrap">
+              <span class="ico" data-icon="mail"></span>
+              <input class="input" id="regEmail" type="email" placeholder="voce@email.com" autocomplete="email" required>
+            </div>
+            <span class="field-error" data-for="regEmail"></span>
+          </div>
+          <div class="field">
+            <label for="regPassword">Senha</label>
+            <div class="input-wrap">
+              <span class="ico" data-icon="lock"></span>
+              <input class="input" id="regPassword" type="password" placeholder="Mínimo 8 caracteres, com letras e números" autocomplete="new-password" required>
+              <button type="button" class="toggle-pw" aria-label="Mostrar senha"></button>
+            </div>
+            <div class="strength" id="strength"><i></i><i></i><i></i><i></i></div>
+            <span class="strength-label" id="strengthLabel">Força da senha</span>
+          </div>
+          <div class="field">
+            <label for="regConfirm">Confirmar senha</label>
+            <div class="input-wrap">
+              <span class="ico" data-icon="lock"></span>
+              <input class="input" id="regConfirm" type="password" placeholder="Repita a senha" autocomplete="new-password" required>
+            </div>
+            <span class="field-error" data-for="regConfirm"></span>
+          </div>
+          <label class="check" style="margin-bottom:20px"><input type="checkbox" id="terms"> Li e aceito os termos de uso</label>
+          <button class="btn btn-primary btn-block" type="submit">Criar minha conta</button>
+        </form>
+
+        <p class="demo-hint">Seus dados ficam guardados no banco de dados local (finance.db).</p>
+      </div>
+    </section>
+  </div>
+
+  <script src="/js/login.js"></script>
+</body>
+</html>
