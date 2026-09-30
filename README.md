@@ -6,33 +6,6 @@ Site completo de gestão financeira com tela de login, banco de dados e painel.
 - **Back end:** Python com Flask (`app.py`)
 - **Banco de dados:** SQLite (arquivo `finance.db`, criado sozinho na primeira execução)
 
----
-
-## ▶️ Como rodar (passo a passo)
-
-1. **Instale o Python** (versão 3.10 ou mais nova): https://www.python.org/downloads/
-   No Windows, marque a opção **"Add Python to PATH"** durante a instalação.
-
-2. **Descompacte** esta pasta e abra um terminal dentro dela
-   (no Windows: abra a pasta, clique na barra de endereço, digite `cmd` e aperte Enter).
-
-3. **Instale o Flask:**
-   ```
-   pip install -r requirements.txt
-   ```
-
-4. **Inicie o servidor:**
-   ```
-   python app.py
-   ```
-
-5. Abra o navegador em **http://127.0.0.1:5000**, clique em **Criar conta** e pronto!
-
-Para desligar o servidor, volte ao terminal e aperte `Ctrl + C`.
-
-> Os gráficos usam a biblioteca Chart.js carregada da internet, então o computador precisa estar conectado.
-
----
 
 ## ✨ Funcionalidades
 
@@ -85,27 +58,3 @@ finance-app/
         ├── common.js   ← funções compartilhadas (API, tema, avisos)
         ├── login.js    ← interatividade do login
         └── app.js      ← lógica do painel
-```
-
-## 🔌 Como o front end conversa com o back end
-
-O JavaScript chama endereços que começam com `/api/`. O Python recebe, consulta o banco
-e devolve os dados em JSON. Exemplos:
-
-| Método | Endereço | O que faz |
-|---|---|---|
-| POST | `/api/register` | Cria conta |
-| POST | `/api/login` | Faz login |
-| GET | `/api/summary?month=2026-09` | Números do painel |
-| GET/POST | `/api/transactions` | Lista / cria lançamentos |
-| PUT/DELETE | `/api/transactions/<id>` | Edita / exclui |
-| GET/POST | `/api/budgets` | Orçamentos |
-| GET/POST | `/api/goals` | Metas |
-| GET | `/api/export.csv` | Baixa planilha |
-
-## 🚀 Para colocar na internet (futuro)
-
-- Defina uma variável de ambiente `SECRET_KEY` com um valor aleatório e secreto
-  (sem ela, todos precisam fazer login de novo sempre que o servidor reinicia).
-- Use um servidor de produção (ex.: `gunicorn app:app`) em vez de `python app.py`.
-- Serviços como Render ou PythonAnywhere hospedam apps Flask.
