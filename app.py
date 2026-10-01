@@ -6,6 +6,8 @@ Como rodar:
     python app.py
 Depois abra http://127.0.0.1:5000 no navegador.
 
+Antes, crie o arquivo .env com o endereço do banco (veja o README).
+
 O servidor faz duas coisas:
   1. Entrega as páginas HTML/CSS/JS (pasta "static").
   2. Oferece uma API em /api/... que o JavaScript chama para ler e
@@ -96,6 +98,14 @@ def parse_amount(value):
     return amount if amount > 0 else None
 
 
+def to_int(value):
+    """Converte para número inteiro; devolve None se não for possível."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def valid_date(value):
     try:
         date.fromisoformat(value)
@@ -162,11 +172,11 @@ def register():
         if conn.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
             return error("Já existe uma conta com este e-mail.", 409)
         cur = conn.execute(
-            "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+            "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?) RETURNING id",
             (name, email, generate_password_hash(password)),
         )
-        seed_categories(conn, cur.lastrowid)
-        user_id = cur.lastrowid
+        user_id = cur.fetchone()["id"]
+        seed_categories(conn, user_id)
 
     session.clear()
     session["user_id"] = user_id
@@ -289,10 +299,11 @@ def create_category():
     icon = (data.get("icon") or "📦")[:4]
     with get_connection() as conn:
         cur = conn.execute(
-            "INSERT INTO categories (user_id, name, type, color, icon) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO categories (user_id, name, type, color, icon) VALUES (?, ?, ?, ?, ?) RETURNING id",
             (uid(), name, ctype, color, icon),
         )
-    return jsonify({"id": cur.lastrowid}), 201
+        new_id = cur.fetchone()["id"]
+    return jsonify({"id": new_id}), 201
 
 
 @app.delete("/api/categories/<int:cat_id>")
@@ -311,7 +322,7 @@ def validate_transaction(data, conn):
     description = (data.get("description") or "").strip()
     amount = parse_amount(data.get("amount"))
     tdate = data.get("date") or date.today().isoformat()
-    category_id = data.get("category_id") or None
+    category_id = to_int(data.get("category_id")) if data.get("category_id") else None
 
     if ttype not in ("income", "expense"):
         return None, "Tipo inválido."
@@ -359,12 +370,12 @@ def list_transactions():
         params.append(request.args["type"])
     if request.args.get("category"):
         sql += " AND t.category_id = ?"
-        params.append(request.args["category"])
+        params.append(to_int(request.args["category"]))
     if request.args.get("status") in ("paid", "pending"):
         sql += " AND t.paid = ?"
         params.append(1 if request.args["status"] == "paid" else 0)
     if request.args.get("q"):
-        sql += " AND (t.description LIKE ? OR t.notes LIKE ?)"
+        sql += " AND (t.description ILIKE ? OR t.notes ILIKE ?)"
         like = f"%{request.args['q']}%"
         params += [like, like]
 
@@ -378,7 +389,7 @@ def list_transactions():
 @login_required
 def create_transaction():
     data = request.get_json(silent=True) or {}
-    repeat = max(1, min(int(data.get("repeat") or 1), 60))  # parcelas/recorrência
+    repeat = max(1, min(to_int(data.get("repeat")) or 1, 60))  # parcelas/recorrência
     with get_connection() as conn:
         tx, problem = validate_transaction(data, conn)
         if problem:
@@ -449,10 +460,10 @@ def summary():
     with get_connection() as conn:
         def total(ttype, where="", params=()):
             row = conn.execute(
-                f"SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id=? AND type=? {where}",
+                f"SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE user_id=? AND type=? {where}",
                 (uid(), ttype, *params),
             ).fetchone()
-            return round(row[0], 2)
+            return round(row["total"], 2)
 
         month_filter = "AND date >= ? AND date < ?"
         income = total("income", month_filter + " AND paid=1", (start, end))
@@ -471,7 +482,7 @@ def summary():
                       SUM(t.amount) AS total
                FROM transactions t LEFT JOIN categories c ON c.id = t.category_id
                WHERE t.user_id=? AND t.type='expense' AND t.date >= ? AND t.date < ?
-               GROUP BY t.category_id ORDER BY total DESC""",
+               GROUP BY t.category_id, c.name, c.color, c.icon ORDER BY total DESC""",
             (uid(), start, end),
         ).fetchall()
 
@@ -537,7 +548,7 @@ def list_budgets():
 def upsert_budget():
     data = request.get_json(silent=True) or {}
     amount = parse_amount(data.get("amount"))
-    category_id = data.get("category_id")
+    category_id = to_int(data.get("category_id"))
     if amount is None or not category_id:
         return error("Escolha a categoria e o valor limite.")
     with get_connection() as conn:
@@ -590,10 +601,11 @@ def create_goal():
     color = data.get("color") if re.fullmatch(r"#[0-9a-fA-F]{6}", data.get("color") or "") else "#6366f1"
     with get_connection() as conn:
         cur = conn.execute(
-            "INSERT INTO goals (user_id, name, target, current, deadline, color) VALUES (?,?,?,?,?,?)",
+            "INSERT INTO goals (user_id, name, target, current, deadline, color) VALUES (?,?,?,?,?,?) RETURNING id",
             (uid(), name[:80], target, current, deadline, color),
         )
-    return jsonify({"id": cur.lastrowid}), 201
+        new_id = cur.fetchone()["id"]
+    return jsonify({"id": new_id}), 201
 
 
 @app.post("/api/goals/<int:goal_id>/deposit")
@@ -606,7 +618,7 @@ def deposit_goal(goal_id):
         return error("Valor inválido.")
     with get_connection() as conn:
         conn.execute(
-            "UPDATE goals SET current = MAX(0, current + ?) WHERE id=? AND user_id=?",
+            "UPDATE goals SET current = GREATEST(0, current + ?) WHERE id=? AND user_id=?",
             (value, goal_id, uid()),
         )
     return jsonify({"ok": True})
@@ -626,7 +638,7 @@ def delete_goal(goal_id):
 @app.get("/api/export.csv")
 @login_required
 def export_csv():
-    sql = """SELECT t.date, t.type, t.description, COALESCE(c.name,''), t.amount, t.paid, t.notes
+    sql = """SELECT t.date, t.type, t.description, COALESCE(c.name,'') AS category, t.amount, t.paid, t.notes
              FROM transactions t LEFT JOIN categories c ON c.id=t.category_id
              WHERE t.user_id=?"""
     params = [uid()]
@@ -642,7 +654,9 @@ def export_csv():
     buf = io.StringIO()
     writer = csv.writer(buf, delimiter=";")
     writer.writerow(["Data", "Tipo", "Descrição", "Categoria", "Valor", "Status", "Observações"])
-    for d, t, desc, cat, amount, paid, notes in rows:
+    for r in rows:
+        d, t, desc, cat = r["date"], r["type"], r["description"], r["category"]
+        amount, paid, notes = r["amount"], r["paid"], r["notes"]
         writer.writerow([
             d, "Receita" if t == "income" else "Despesa", desc, cat,
             f"{amount:.2f}".replace(".", ","), "Pago" if paid else "Pendente", notes,

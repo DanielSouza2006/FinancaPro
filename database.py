@@ -1,13 +1,19 @@
 """
-database.py — Tudo que conversa com o banco de dados (SQLite).
+database.py — Tudo que conversa com o banco de dados (PostgreSQL no Supabase).
 
-SQLite é um banco de dados que fica guardado em um único arquivo
-(finance.db). Não precisa instalar nada: ele já vem com o Python.
+O endereço do banco fica na variável de ambiente DATABASE_URL:
+  - No seu computador: dentro do arquivo .env (que NÃO vai para o GitHub)
+  - No Render: nas configurações "Environment" do serviço
 """
-import sqlite3
-from pathlib import Path
+import os
 
-DB_PATH = Path(__file__).parent / "finance.db"
+import psycopg
+from dotenv import load_dotenv
+from psycopg.rows import dict_row
+
+# Lê o arquivo .env (se existir) e carrega as variáveis de ambiente
+load_dotenv()
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # Categorias criadas automaticamente para cada novo usuário
 DEFAULT_CATEGORIES = [
@@ -29,15 +35,15 @@ DEFAULT_CATEGORIES = [
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    name          TEXT    NOT NULL,
-    email         TEXT    NOT NULL UNIQUE,
-    password_hash TEXT    NOT NULL,
-    created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    id            SERIAL PRIMARY KEY,
+    name          TEXT   NOT NULL,
+    email         TEXT   NOT NULL UNIQUE,
+    password_hash TEXT   NOT NULL,
+    created_at    TEXT   NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 
 CREATE TABLE IF NOT EXISTS categories (
-    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    id       SERIAL  PRIMARY KEY,
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name     TEXT    NOT NULL,
     type     TEXT    NOT NULL CHECK (type IN ('income', 'expense')),
@@ -46,52 +52,91 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    id           SERIAL  PRIMARY KEY,
     user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     category_id  INTEGER REFERENCES categories(id) ON DELETE SET NULL,
     type         TEXT    NOT NULL CHECK (type IN ('income', 'expense')),
     description  TEXT    NOT NULL,
-    amount       REAL    NOT NULL CHECK (amount > 0),
+    amount       DOUBLE PRECISION NOT NULL CHECK (amount > 0),
     date         TEXT    NOT NULL,           -- formato AAAA-MM-DD
     paid         INTEGER NOT NULL DEFAULT 1, -- 1 = pago/recebido, 0 = pendente
     notes        TEXT    DEFAULT '',
-    created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+    created_at   TEXT    NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 
 CREATE TABLE IF NOT EXISTS budgets (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    id           SERIAL  PRIMARY KEY,
     user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     category_id  INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
-    amount       REAL    NOT NULL CHECK (amount > 0),
+    amount       DOUBLE PRECISION NOT NULL CHECK (amount > 0),
     UNIQUE (user_id, category_id)
 );
 
 CREATE TABLE IF NOT EXISTS goals (
-    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    id        SERIAL  PRIMARY KEY,
     user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name      TEXT    NOT NULL,
-    target    REAL    NOT NULL CHECK (target > 0),
-    current   REAL    NOT NULL DEFAULT 0,
+    target    DOUBLE PRECISION NOT NULL CHECK (target > 0),
+    current   DOUBLE PRECISION NOT NULL DEFAULT 0,
     deadline  TEXT,
     color     TEXT    NOT NULL DEFAULT '#6366f1'
 );
 
 CREATE INDEX IF NOT EXISTS idx_tx_user_date ON transactions(user_id, date);
+
+-- Segurança do Supabase: bloqueia o acesso às tabelas pela API pública dele.
+-- O nosso servidor Flask continua acessando normalmente.
+ALTER TABLE users        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE budgets      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goals        ENABLE ROW LEVEL SECURITY;
 """
 
 
+class Connection:
+    """
+    Pequeno "adaptador" para o resto do código continuar igual ao da
+    versão com SQLite: aceita '?' nas consultas e devolve as linhas
+    como dicionários. Usado sempre com:  with get_connection() as conn:
+    """
+
+    def __init__(self):
+        if not DATABASE_URL:
+            raise RuntimeError(
+                "DATABASE_URL não configurada. Crie o arquivo .env com o endereço do Supabase."
+            )
+        self._conn = psycopg.connect(DATABASE_URL, row_factory=dict_row, prepare_threshold=None)
+
+    def execute(self, sql, params=None):
+        # O SQLite usa '?' para os valores; o PostgreSQL usa '%s'
+        return self._conn.execute(sql.replace("?", "%s"), params)
+
+    def executemany(self, sql, seq):
+        with self._conn.cursor() as cur:
+            cur.executemany(sql.replace("?", "%s"), seq)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        # Salva as alterações se deu tudo certo; desfaz se deu erro
+        if exc_type is None:
+            self._conn.commit()
+        else:
+            self._conn.rollback()
+        self._conn.close()
+
+
 def get_connection():
-    """Abre uma conexão com o banco. Cada linha volta como um dicionário."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+    """Abre uma conexão com o banco."""
+    return Connection()
 
 
 def init_db():
     """Cria as tabelas (se ainda não existirem)."""
     with get_connection() as conn:
-        conn.executescript(SCHEMA)
+        conn.execute(SCHEMA)
 
 
 def seed_categories(conn, user_id):
