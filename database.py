@@ -103,8 +103,10 @@ class Connection:
 
     def __init__(self):
         if not DATABASE_URL:
+            nomes = sorted(k for k in os.environ if "DATA" in k.upper() or "SECRET" in k.upper())
             raise RuntimeError(
-                "DATABASE_URL não configurada. Crie o arquivo .env com o endereço do Supabase."
+                f"DATABASE_URL não configurada. Serviço: {os.environ.get('RENDER_SERVICE_NAME')}. "
+                f"Variáveis parecidas encontradas: {nomes}"
             )
         self._conn = psycopg.connect(DATABASE_URL, row_factory=dict_row, prepare_threshold=None)
 
